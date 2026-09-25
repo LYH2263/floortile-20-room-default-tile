@@ -1,6 +1,14 @@
 from app.db import connect
 
 
+def _migrate(conn):
+    """Add columns introduced after the initial schema to existing databases."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(rooms)").fetchall()}
+    if "preferred_tile_id" not in cols:
+        conn.execute("ALTER TABLE rooms ADD COLUMN preferred_tile_id INTEGER")
+        conn.commit()
+
+
 def init_db():
     conn = connect()
     conn.executescript(
@@ -11,7 +19,8 @@ def init_db():
             length REAL NOT NULL,
             width REAL NOT NULL,
             data_quality TEXT NOT NULL DEFAULT 'clean',
-            note TEXT DEFAULT ''
+            note TEXT DEFAULT '',
+            preferred_tile_id INTEGER
         );
         CREATE TABLE IF NOT EXISTS tiles(
             id INTEGER PRIMARY KEY,
@@ -32,6 +41,7 @@ def init_db():
         );
         """
     )
+    _migrate(conn)
     if conn.execute("SELECT COUNT(*) c FROM rooms").fetchone()["c"] == 0:
         conn.executemany(
             "INSERT INTO rooms(name,length,width,data_quality,note) VALUES (?,?,?,?,?)",

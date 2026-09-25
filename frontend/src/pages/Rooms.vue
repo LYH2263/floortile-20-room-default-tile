@@ -8,12 +8,14 @@ onMounted(async () => { items.value = (await getJSON('/api/rooms')).items })
   <div class="page">
     <h1>房间档案</h1>
     <table class="tbl">
-      <thead><tr><th>名称</th><th>长×宽</th><th>质量</th><th></th></tr></thead>
+      <thead><tr><th>名称</th><th>长×宽</th><th>质量</th><th>默认砖</th><th></th></tr></thead>
       <tbody>
         <tr v-for="r in items" :key="r.id">
           <td>{{ r.name }}</td>
           <td>{{ r.length }} × {{ r.width }}</td>
           <td :class="r.data_quality">{{ r.data_quality === 'clean' ? '正常' : '脏数据' }}</td>
+          <td v-if="r.preferred_tile_id">{{ r.preferred_tile_name }}</td>
+          <td v-else class="muted">未设置</td>
           <td><router-link :to="`/rooms/${r.id}`">详情</router-link></td>
         </tr>
       </tbody>
