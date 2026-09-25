@@ -5,20 +5,21 @@ def init_db():
     conn = connect()
     conn.executescript(
         """
-        CREATE TABLE IF NOT EXISTS rooms(
-            id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL,
-            length REAL NOT NULL,
-            width REAL NOT NULL,
-            data_quality TEXT NOT NULL DEFAULT 'clean',
-            note TEXT DEFAULT ''
-        );
         CREATE TABLE IF NOT EXISTS tiles(
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL,
             tile_l REAL NOT NULL,
             tile_w REAL NOT NULL,
             data_quality TEXT NOT NULL DEFAULT 'clean'
+        );
+        CREATE TABLE IF NOT EXISTS rooms(
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            length REAL NOT NULL,
+            width REAL NOT NULL,
+            data_quality TEXT NOT NULL DEFAULT 'clean',
+            note TEXT DEFAULT '',
+            preferred_tile_id INTEGER REFERENCES tiles(id)
         );
         CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS calc_runs(
@@ -32,6 +33,7 @@ def init_db():
         );
         """
     )
+    _migrate(conn)
     if conn.execute("SELECT COUNT(*) c FROM rooms").fetchone()["c"] == 0:
         conn.executemany(
             "INSERT INTO rooms(name,length,width,data_quality,note) VALUES (?,?,?,?,?)",
@@ -50,5 +52,31 @@ def init_db():
             ],
         )
         conn.execute("INSERT INTO settings(key,value) VALUES ('waste_pct','8')")
-        conn.commit()
+    _ensure_default_tile_setting(conn)
+    conn.commit()
     conn.close()
+
+
+def _migrate(conn):
+    """Add columns introduced after the first schema to existing databases."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(rooms)").fetchall()}
+    if "preferred_tile_id" not in cols:
+        conn.execute(
+            "ALTER TABLE rooms ADD COLUMN preferred_tile_id INTEGER REFERENCES tiles(id)"
+        )
+
+
+def _ensure_default_tile_setting(conn):
+    """System default tile: the seeded 600x600, else the first clean tile."""
+    row = conn.execute(
+        "SELECT id FROM tiles WHERE name='600x600' AND data_quality='clean'"
+    ).fetchone()
+    if not row:
+        row = conn.execute(
+            "SELECT id FROM tiles WHERE data_quality='clean' ORDER BY id LIMIT 1"
+        ).fetchone()
+    if row:
+        conn.execute(
+            "INSERT OR IGNORE INTO settings(key,value) VALUES ('default_tile_id', ?)",
+            (str(row["id"]),),
+        )

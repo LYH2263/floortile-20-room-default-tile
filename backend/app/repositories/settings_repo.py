@@ -17,3 +17,13 @@ def get_all() -> dict:
 def get_waste_pct() -> float:
     raw = get_all().get("waste_pct", str(DEFAULT_WASTE_PCT))
     return float(raw)
+
+
+def get_default_tile_id() -> int | None:
+    raw = get_all().get("default_tile_id")
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
